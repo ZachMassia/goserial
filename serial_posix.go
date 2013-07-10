@@ -17,7 +17,7 @@ import (
 	//"unsafe"
 )
 
-func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error) {
+func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error, fdesc C.int) {
 	f, err := os.OpenFile(name, syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_NONBLOCK, 0666)
 	if err != nil {
 		return
@@ -26,14 +26,14 @@ func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error) {
 	fd := C.int(f.Fd())
 	if C.isatty(fd) != 1 {
 		f.Close()
-		return nil, errors.New("File is not a tty")
+		return nil, errors.New("File is not a tty"), 0
 	}
 
 	var st C.struct_termios
 	_, err = C.tcgetattr(fd, &st)
 	if err != nil {
 		f.Close()
-		return nil, err
+		return nil, err, 0
 	}
 	var speed C.speed_t
 	switch baud {
@@ -53,18 +53,18 @@ func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error) {
 		speed = C.B2400
 	default:
 		f.Close()
-		return nil, fmt.Errorf("Unknown baud rate %v", baud)
+		return nil, fmt.Errorf("Unknown baud rate %v", baud), 0
 	}
 
 	_, err = C.cfsetispeed(&st, speed)
 	if err != nil {
 		f.Close()
-		return nil, err
+		return nil, err, 0
 	}
 	_, err = C.cfsetospeed(&st, speed)
 	if err != nil {
 		f.Close()
-		return nil, err
+		return nil, err, 0
 	}
 
 	// Select local mode
@@ -77,7 +77,7 @@ func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error) {
 	_, err = C.tcsetattr(fd, C.TCSANOW, &st)
 	if err != nil {
 		f.Close()
-		return nil, err
+		return nil, err, 0
 	}
 
 	//fmt.Println("Tweaking", name)
@@ -88,7 +88,7 @@ func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error) {
 	if e != 0 || r1 != 0 {
 		s := fmt.Sprint("Clearing NONBLOCK syscall error:", e, r1)
 		f.Close()
-		return nil, errors.New(s)
+		return nil, errors.New(s), 0
 	}
 
 	/*
@@ -103,5 +103,5 @@ func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error) {
 				}
 	*/
 
-	return f, nil
+	return f, nil, fd
 }
