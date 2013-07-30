@@ -17,7 +17,14 @@ import (
 	//"unsafe"
 )
 
-func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error, fdesc C.int) {
+// The arguments to Flush()
+const (
+	TCIFLUSH  int = int(C.TCIFLUSH)
+	TCOFLUSH  int = int(C.TCOFLUSH)
+	TCIOFLUSH int = int(C.TCIOFLUSH)
+)
+
+func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error, fdesc uintptr) {
 	f, err := os.OpenFile(name, syscall.O_RDWR|syscall.O_NOCTTY|syscall.O_NONBLOCK, 0666)
 	if err != nil {
 		return
@@ -103,5 +110,10 @@ func openPort(name string, baud int) (rwc io.ReadWriteCloser, err error, fdesc C
 				}
 	*/
 
-	return f, nil, fd
+	return f, nil, f.Fd()
+}
+
+func Flush(fd uintptr, queue int) (err error) {
+	_, err = C.tcflush(C.int(fd), C.int(queue))
+	return
 }
